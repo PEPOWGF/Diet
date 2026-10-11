@@ -43,6 +43,7 @@ label.chk{display:flex;gap:8px;align-items:center}
 .bar i{display:block;height:100%;background:var(--ac);border-radius:6px}
 .bar.wat i{background:var(--wat)}
 .bar.over i{background:var(--bad)}
+.bar.fib i{background:var(--ok)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stat{border:1px solid var(--line);border-radius:12px;padding:10px}
 .stat b{font-size:18px}
@@ -71,14 +72,17 @@ li{margin:2px 0}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
 td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+datalist{display:none}
 </style>
 </head>
 <body>
 <div id="toast"></div>
+<datalist id="foods"></datalist>
 <div id="app"></div>
 <nav class="tabs" id="tabs">
 <button data-a="tab" data-v="oggi"><span>📝</span>Oggi</button>
 <button data-a="tab" data-v="sett"><span>📊</span>Settimana</button>
+<button data-a="tab" data-v="cibi"><span>🍽️</span>Alimenti</button>
 <button data-a="tab" data-v="piano"><span>📖</span>Piano</button>
 </nav>
 <script>
@@ -86,8 +90,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DN=['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const KEY='dieta_diario_v1';
-let DB={days:{},set:{on:true,from:15,to:22}};
-try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);DB.days=p.days||{};DB.set=Object.assign(DB.set,p.set||{});}}catch(e){}
+let DB={custom:[],days:{},set:{on:true,from:15,to:22}};
+try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);DB.days=p.days||{};DB.custom=p.custom||[];DB.set=Object.assign(DB.set,p.set||{});}}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}}
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -118,7 +122,20 @@ const PLAN=[
 {pranzo:{s:'Primo della domenica',c:['carne'],l:['Tagliatelle fresche all\'uovo 120g o tortellini 200g o pasta 100g','Ragù di carne macinata e selezionata 100g + parmigiano 20g (2 cucchiai grandi) o sugo di pesce misto o salmone per pasta 150g','Verdura o funghi a volontà']},
  cena:{s:'Formaggio fresco',c:['formaggio'],l:['Pane integrale 80g o riso basmati 60g','Ricotta fresca 200g o mozzarella light 1 bocconcino 125g o philadelphia light o stracchino 100g o fiocchi di latte 175g','Verdura di stagione a volontà']}}
 ];
-const SLOT={pranzo:'☀️ Pranzo',cena:'🌙 Cena',altro:'🍎 Colazione, spuntini, extra'};
+const F150='Frutta fresca 150g (1 frutto grande o 2 piccoli)',W30='Shaker di proteine whey: 1 misurino da 30g',M2='Merenda 2: frutta fresca 150g';
+const PANC={s:'Pancake Milk pro',c:[],l:['Pancake Milk pro n.2 con un velo di marmellata o miele',M2]};
+const POMW={s:'Frutta + whey',c:[],l:[F150,W30,'Max 1 banana al giorno, non troppo matura']};
+const SALM={s:'Pane + salmone affumicato',c:['pesce'],l:['Pane ai cereali o integrale 60g + salmone affumicato 50g',M2]};
+const SNACK=[
+{col:{s:'Frutta + whey',c:[],l:[F150,W30]},mat:PANC,pom:{s:'Frutta + yogurt greco',c:[],l:[F150,'Yogurt greco 2% di grassi: 1 vasetto da 170g (yogurt, skyr, kefir o mousse: max 2 volte a settimana)']}},
+{col:{s:'Frutta + mandorle',c:[],l:[F150,'Mandorle n.10']},mat:{s:'Pane + bresaola',c:['affettati'],l:['Pane integrale 60g + bresaola 30g (affettati: max 1 volta a settimana)',M2]},pom:POMW},
+{col:{s:'Frutta + noci',c:[],l:[F150,'Noci intere n.2']},mat:PANC,pom:POMW},
+{col:{s:'Frutta + whey',c:[],l:[F150,W30]},mat:SALM,pom:{s:'Frutta + skyr',c:[],l:[F150,'Skyr 150g (seconda e ultima porzione di yogurt/skyr della settimana)']}},
+{col:{s:'Frutta + anacardi o pistacchi',c:[],l:[F150,'Anacardi o pistacchi al naturale 10g']},mat:PANC,pom:POMW},
+{col:{s:'Frutta + cioccolato fondente',c:[],l:[F150,'Cioccolato fondente min. 85% pasta di cacao 10g']},mat:{s:'Pane + humus di ceci',c:['legumi'],l:['Pane integrale 60g + humus di ceci 50g',M2]},pom:POMW},
+{col:{s:'Frutta + nocciole',c:[],l:[F150,'Nocciole n.10']},mat:SALM,pom:POMW}];
+PLAN.forEach((p,i)=>{p.colazione=SNACK[i].col;p.mattina=SNACK[i].mat;p.pomeriggio=SNACK[i].pom;});
+const SLOT={colazione:'🌅 Colazione',mattina:'🥪 Spuntino mattina',pranzo:'☀️ Pranzo',pomeriggio:'🍌 Spuntino pomeriggio',cena:'🌙 Cena',altro:'➕ Extra / fuori piano'};
 const CATS={pesce:'🐟 Pesce',formaggio:'🧀 Formaggio',carne:'🍗 Carne',affettati:'🥓 Affettati',uova:'🥚 Uova',legumi:'🫘 Legumi'};
 const KW={
 affettati:['bresaola','prosciutto','arrosto di tacchino','arrostino','affettat'],
@@ -134,11 +151,96 @@ function detect(n){let t=' '+n.toLowerCase()+' ';const out=[];
 const AVOID=['mortadella','salsiccia','wurstel','würstel','burro','glassa','birra'];
 function avoidHit(n){const t=n.toLowerCase();return AVOID.find(a=>t.includes(a))||(/\bvino\b/.test(t)&&!t.includes('aceto')?'vino':null);}
 
+/* ---------- ALIMENTI (valori indicativi per 100 g, crudo/come da piano) ---------- */
+const FOODS_RAW=[
+["Cereali, pane e patate",[
+["Pasta",353,10.9,79.1,1.4,0.3,3,120],["Pasta integrale",330,12.5,66,2.5,0.4,8,120],["Pasta all'uovo (secca)",368,13,74,2.8,0.8,3,100],
+["Tagliatelle fresche all'uovo",278,11,54,2.5,0.7,2.5,120],["Tortellini freschi",300,12,38,10,4,2,200],["Orecchiette fresche",280,9,56,1.5,0.3,2.5,150],
+["Riso",332,6.7,80.4,0.4,0.1,1,120],["Riso basmati",349,8.5,77,0.8,0.2,1.3,120],["Riso integrale",335,7.5,76,2.2,0.5,3.5,120],["Riso venere",350,8.5,75,2.5,0.5,5,120],
+["Farro (perlato)",335,15,67,2.5,0.4,6.8,120],["Orzo (perlato)",319,10.4,73.8,1.4,0.3,9.2,120],["Cous cous",360,12.5,73,1.5,0.3,3.5,120],["Quinoa",368,14.1,64,6.1,0.7,7,120],
+["Patate",85,2.1,18,0.1,0,1.6,300],["Patate dolci",86,1.6,20,0.1,0,3,300],
+["Pane",275,8.5,58,0.5,0.1,2.8,100],["Pane integrale",245,9.5,46,2.5,0.4,6.5,100],["Pane ai cereali",260,9.5,48,3.5,0.5,6,100],
+["Frisella integrale",335,12,66,2,0.4,8,80],["Wasa (fette di segale)",340,9,66,1.5,0.2,15,80],["Granetti integrali",400,11,68,8,1.5,8,80],
+["Cracker (Galbusera/Misura)",430,10,70,12,5,3,30],["Cereali da colazione",365,8,72,3,0.8,7,40],["Fiocchi d'avena",372,13,60,7,1.3,10,40],
+["Pancake proteico Milk pro (stima)",250,17,30,6,2,4,60]]],
+["Carne e affettati (crudi)",[
+["Petto di pollo",110,23.3,0,1,0.3,0,200],["Tacchino (fesa/petto)",107,23.8,0,1,0.3,0,200],["Coniglio",136,20.7,0,5.5,1.6,0,200],
+["Manzo magro (bistecca/tagliata)",130,21.5,0,4.5,1.9,0,200],["Hamburger di carne magra",150,20,0,7.5,3,0,200],["Carne macinata magra (ragù)",150,20,0,7.5,3,0,100],
+["Vitello",110,20.7,0,2.5,1,0,200],["Maiale magro (lonza)",140,21,0,6,2.1,0,200],["Cavallo (equino)",108,21.5,0,2.5,1,0,200],
+["Bresaola",151,32,0,2.6,1.2,0,30],["Prosciutto crudo (sgrassato)",190,26,0,9.5,3.5,0,30],["Arrosto di tacchino (affettato)",105,17,1.5,3,0.9,0,30],["Prosciutto cotto",145,19,1,7,2.5,0,50],["Salame",430,25,1,35,13,0,30]]],
+["Pesce e frutti di mare",[
+["Salmone fresco",200,20,0,13,2.7,0,200],["Salmone affumicato",170,25,0,7.5,1.5,0,50],["Tonno fresco",140,23,0,5,1.3,0,250],
+["Tonno sott'olio (sgocciolato)",192,25.2,0,10.1,1.9,0,120],["Tonno al naturale",100,23,0,0.9,0.2,0,100],["Sgombro fresco",180,19,0,11.5,2.5,0,250],
+["Sgombro sott'olio (sgocciolato)",250,20,0,18,3.5,0,100],["Sardine fresche",130,19.5,0,5.5,1.4,0,250],["Sardine sott'olio (sgocciolate)",215,25,0,12,2.5,0,100],
+["Alici (acciughe) fresche",100,17,0,3.5,0.9,0,250],["Orata",120,19.5,0,4.5,1.2,0,250],["Spigola",100,18,0,3,0.8,0,250],["Merluzzo / nasello",70,16,0,0.5,0.1,0,250],
+["Platessa",91,17,0,2,0.4,0,250],["Sogliola",83,17,0,1.7,0.4,0,250],["Coda di rospo",78,16,0,1.5,0.3,0,250],["Pesce spada",110,19,0,4,1.1,0,250],
+["Trota",135,19.5,0,6,1.4,0,250],["Aringa",200,18,0,14,3.5,0,250],["Calamari",70,12,2,1.2,0.3,0,250],["Seppie",72,14,0.7,1,0.2,0,250],["Polpo",60,11,1,1,0.2,0,250],
+["Gamberi / mazzancolle",75,15,1,1,0.2,0,150],["Cozze",70,11,3,2,0.4,0,250],["Vongole",72,12,2.5,1,0.2,0,250],["Frutti di mare misti",70,12,2.5,1,0.2,0,150],
+["Pesce fresco o surgelato (generico)",100,18,0,3,0.7,0,250]]],
+["Uova e latticini",[
+["Uova",128,12.4,0.7,8.7,2.7,0,120],["Albume",45,10,0.7,0,0,0,100],["Ricotta fresca",146,8.8,3.5,10.9,7,0,150],["Mozzarella light",150,17.5,1,8.5,5.5,0,125],
+["Fiocchi di latte",95,12,3,4,2.6,0,175],["Primo sale",255,17,1,20,13,0,100],["Parmigiano",392,33.5,0,28,18,0,20],["Stracchino",300,18,2,25,17,0,100],
+["Philadelphia light",170,8,4,13,8.5,0,100],["Robiola",280,16,2,23,15,0,100],["Certosa",300,15,2,26,16,0,100],
+["Yogurt greco 2%",73,9.5,4,2,1.3,0,170],["Skyr",63,11,4,0.2,0.1,0,150],["Kefir",55,3.5,4.5,2.5,1.6,0,150],["Mousse proteica (stima)",70,10,6,0.6,0.4,0,200],
+["Latte parzialmente scremato",46,3.3,5,1.5,1,0,250],["Proteine whey (polvere)",400,80,6,6,3,0,30]]],
+["Legumi",[
+["Legumi in barattolo (scolati)",100,6.5,14,1.5,0.2,6,150],["Ceci in barattolo",120,7,17,2.5,0.3,5.5,150],["Fagioli in barattolo",95,6.5,14.5,0.5,0.1,6.5,150],
+["Lenticchie in barattolo",90,7,12,0.5,0.1,6,150],["Piselli (freschi/surgelati)",70,5.5,8,0.5,0.1,5.5,150],["Legumi secchi (media)",310,21,50,2.5,0.4,15,50],["Humus di ceci",240,7,13,17,2.5,5,50]]],
+["Verdura",[
+["Verdura di stagione (media)",25,2,3,0.3,0,2.5,200],["Insalata",15,1.5,2,0.2,0,1.5,80],["Pomodori",19,1,3.5,0.2,0,1.2,150],["Zucchine",16,1.3,1.4,0.2,0,1,200],
+["Spinaci",31,3.4,2,0.7,0.1,2.1,200],["Carote",41,1,7.6,0.2,0,3,150],["Broccoli",37,3.3,2.7,0.4,0.1,3,200],["Cavolfiore",30,3.2,2.4,0.4,0.1,2.5,200],
+["Peperoni",26,0.9,5,0.3,0.1,1.9,200],["Melanzane",20,1,3,0.3,0.1,2.5,200],["Funghi champignon",25,3,2,0.3,0.1,1.5,200],["Fagiolini",30,2,3.5,0.2,0,2.5,200]]],
+["Frutta fresca",[
+["Frutta fresca (media)",45,0.7,10,0.2,0,2,150],["Mela",45,0.2,11,0.2,0,2,150],["Pera",40,0.3,9,0.1,0,3.8,150],["Banana",89,1.1,21,0.3,0.1,2,120],
+["Arancia",36,0.7,7,0.2,0,1.6,150],["Mandarini",44,0.6,9,0.2,0,1.7,150],["Kiwi",47,1.2,10,0.4,0,2.1,150],["Fragole",32,0.8,6,0.4,0,1.6,150],["Uva",61,0.5,16,0.1,0,1.5,150],
+["Pesca",39,0.9,9,0.2,0,1.5,150],["Ananas",40,0.5,10,0.1,0,1.4,150],["Melone",33,0.8,7,0.2,0,0.9,150],["Anguria",16,0.5,3.7,0.1,0,0.3,150]]],
+["Frutta secca e cioccolato",[
+["Mandorle",600,22,5,53,4,12.5,10],["Nocciole",650,13,7,62,4.5,10,10],["Noci",690,15,3.5,68,6.5,6.5,15],["Anacardi",590,18,30,46,8,3.3,10],["Pistacchi",580,20,18,50,6,10,10],
+["Cioccolato fondente ≥85%",580,10,20,46,28,13,10]]],
+["Condimenti e dolci",[
+["Burro",750,0.8,0.1,83,52,0,10],["Miele",304,0.6,80,0,0,0,5],["Zucchero",392,0,100,0,0,0,5],["Marmellata (senza zuccheri aggiunti)",120,0.4,28,0.1,0,1,15],
+["Passata di pomodoro",25,1.3,4.5,0.2,0,1.5,100]]],
+["Altro (pasti liberi)",[
+["Pizza margherita",250,10,33,9,4,2,300],["Patatine fritte",330,3.5,40,17,2,4,150],["Gelato",200,4,25,10,6,0,100],["Biscotti secchi",430,7,75,10,3,2.5,30],
+["Cornetto / brioche",400,8,47,21,10,2,60],["Crema di nocciole (tipo Nutella)",540,6,57,31,11,3.5,15],["Cioccolato al latte",540,7,57,31,19,2,30]]]
+];
+const FOODS=[];FOODS_RAW.forEach(g=>g[1].forEach(r=>FOODS.push({cat:g[0],n:r[0],k:r[1],p:r[2],c:r[3],f:r[4],s:r[5],fi:r[6],por:r[7]})));
+function allFoods(){return FOODS.concat((DB.custom||[]).map(x=>Object.assign({cat:'Miei alimenti',custom:1},x)));}
+function fillList(){const d=$('#foods');if(d)d.innerHTML=allFoods().map(f=>'<option value="'+esc(f.n)+'">').join('');}
+function findFood(q){q=String(q||'').trim().toLowerCase();if(!q)return null;const A=allFoods();
+ let r=A.find(x=>x.n.toLowerCase()===q);if(r)return r;
+ let c=A.filter(x=>x.n.toLowerCase().includes(q));if(c.length)return c.sort((a,b)=>a.n.length-b.n.length)[0];
+ c=A.filter(x=>q.includes(x.n.toLowerCase().split(' (')[0]));if(c.length)return c.sort((a,b)=>b.n.length-a.n.length)[0];
+ return null;}
+function scale(f,gr){const k=gr/100;return [f.k,f.p,f.c,f.f,f.s||0,f.fi||0].map(x=>x*k);}
+function nutOf(g){if(g.nu)return g.nu;const f=findFood(g.n);if(!f)return null;return scale(f,g.g>0?g.g:(f.por||100));}
+const TG={kcal:2250,p:125,c:281,f:70,s:25,fib:25};
+const NK=['kcal','p','c','f','s','fib'];
+function zero(){return{kcal:0,p:0,c:0,f:0,s:0,fib:0,unk:0};}
+function mealN(M){const N=zero();M.ing.forEach(g=>{const a=nutOf(g);if(!a){N.unk++;return;}NK.forEach((k,i)=>{N[k]+=a[i];});});
+ const o=+M.oil||0;N.kcal+=o*9;N.f+=o;N.s+=o*0.14;return N;}
+function dayN(s){const N=zero(),D=DB.days[s];if(!D)return N;
+ Object.values(D.meals).forEach(M=>{const m=mealN(M);NK.forEach(k=>{N[k]+=m[k];});N.unk+=m.unk;});
+ const sg=+D.sugar||0;N.kcal+=sg*3.9;N.c+=sg;return N;}
+function mealLine(M){const N=mealN(M);if(!N.kcal&&!N.unk)return '';
+ return '<div class="mut" style="margin-top:4px">≈ '+Math.round(N.kcal)+' kcal · P '+fmt(N.p)+' g · C '+fmt(N.c)+' g · L '+fmt(N.f)+' g'+(N.unk?' · '+N.unk+' senza valori':'')+'</div>';}
+function nutHTML(N){
+ const pc=Math.round(N.kcal/TG.kcal*100),left=Math.round(TG.kcal-N.kcal);
+ const mk=N.c*4+N.p*4+N.f*9||1;
+ const line=(lab,v,max,unit,keep,note)=>'<div class="row sp" style="margin-top:8px"><b>'+lab+'</b><span class="'+(v>max&&!keep?'high':'')+'">'+fmt(v)+' / '+max+unit+(note||'')+'</span></div>'+bar(v,max,keep?'fib':'');
+ return '<div class="row sp"><b>🔥 Energia</b><span class="'+(N.kcal>TG.kcal?'high':'')+'">'+Math.round(N.kcal)+' / '+TG.kcal+' kcal ('+pc+'%)</span></div>'+bar(N.kcal,TG.kcal)+
+ '<div class="mut">'+(left>=0?'Restano '+left+' kcal':'Oltre di '+(-left)+' kcal')+'</div>'+
+ line('🥩 Proteine',N.p,TG.p,' g',false,' (max)')+line('🍝 Glucidi',N.c,TG.c,' g',false)+line('🧈 Lipidi',N.f,TG.f,' g',false)+
+ line('Di cui grassi saturi',N.s,TG.s,' g',false,' (&lt;10% kcal)')+line('🌾 Fibre',N.fib,TG.fib,' g',true,' (25-30)')+
+ '<div class="mut" style="margin-top:8px">Ripartizione: glucidi '+Math.round(N.c*4/mk*100)+'% · proteine '+Math.round(N.p*4/mk*100)+'% · lipidi '+Math.round(N.f*9/mk*100)+'% (obiettivo 50 / 22 / 28)</div>'+
+ (N.unk?'<div class="mut" style="color:var(--warn)">⚠️ '+N.unk+' ingredienti senza valori nutrizionali: aggiungili da Alimenti.</div>':'')+
+ '<div class="mut" style="margin-top:4px">Valori indicativi: olio e zucchero/miele inclusi.</div><hr style="border:0;border-top:1px solid var(--line);margin:12px 0">';}
+
 /* ---------- STATE ---------- */
 let tab='oggi',sel=ymd(new Date()),repMon=ymd(monday(new Date()));
 let needWater=false,lastHour=null,wAck=null;
 function toast(m){const t=$('#toast');t.innerHTML='<div class="toast">'+esc(m)+'</div>';setTimeout(()=>{t.innerHTML='';},3500);}
-function bar(v,max,cls){const p=Math.min(100,max?v/max*100:0);return '<div class="bar '+(cls||'')+(v>max&&cls!=='wat'?' over':'')+'"><i style="width:'+p+'%"></i></div>';}
+function bar(v,max,cls){const p=Math.min(100,max?v/max*100:0);return '<div class="bar '+(cls||'')+(v>max&&cls!=='wat'&&cls!=='fib'?' over':'')+'"><i style="width:'+p+'%"></i></div>';}
 function totals(s){const D=DB.days[s];let oil=0,salt=0;if(D)Object.values(D.meals).forEach(m=>{oil+=+m.oil||0;salt+=+m.salt||0;});return{oil,salt};}
 
 /* ---------- BANNERS ---------- */
@@ -149,6 +251,9 @@ function bannersHTML(){
  const P=PLAN[widx(now)];let out='';
  if(needWater&&inWin(h)&&(DB.days[today]?DB.days[today].water:0)<2.5){
   out+='<div class="ban w"><b>💧 Ora di bere un po\' d\'acqua</b>Sei a '+fmt(DB.days[today]?DB.days[today].water:0)+' L su 2,5 L.<div class="row"><button class="sm wat" data-a="water" data-v="0.2" data-ack="1">+0,2 L</button><button class="sm wat" data-a="water" data-v="0.5" data-ack="1">+0,5 L</button><button class="sm" data-a="ackWater">Più tardi</button></div></div>';}
+ if(h>=8&&h<10&&!logged(peek(today,'colazione')))out+='<div class="ban"><b>🌅 Colazione</b>Nel piano oggi: '+esc(P.colazione.s)+'.<div class="row"><button class="sm" data-a="goto" data-k="colazione">Registra</button></div></div>';
+ if(h>=10&&h<12&&!logged(peek(today,'mattina')))out+='<div class="ban"><b>🥪 Spuntino mattina</b>Nel piano oggi: '+esc(P.mattina.s)+'.<div class="row"><button class="sm" data-a="goto" data-k="mattina">Registra</button></div></div>';
+ if(h>=16&&h<19&&!logged(peek(today,'pomeriggio')))out+='<div class="ban"><b>🍌 Spuntino pomeriggio</b>Nel piano oggi: '+esc(P.pomeriggio.s)+'.<div class="row"><button class="sm" data-a="goto" data-k="pomeriggio">Registra</button></div></div>';
  if(h>=12&&!logged(peek(today,'pranzo')))out+='<div class="ban"><b>🍽️ Pranzo: cosa hai mangiato?</b>Nel piano oggi: '+esc(P.pranzo.s)+'. Registra cibo, olio e sale.<div class="row"><button class="sm" data-a="goto" data-k="pranzo">Registra pranzo</button></div></div>';
  if(h>=19&&!logged(peek(today,'cena')))out+='<div class="ban"><b>🌙 Cena: cosa hai mangiato?</b>Nel piano stasera: '+esc(P.cena.s)+'. Registra cibo, olio e sale.<div class="row"><button class="sm" data-a="goto" data-k="cena">Registra cena</button></div></div>';
  return out;}
@@ -157,14 +262,14 @@ function bannersHTML(){
 function mealCard(k,wi){
  const M=meal(sel,k),P=PLAN[wi][k];
  let planBlock='';
- if(P){planBlock='<details><summary>Piano di '+DN[wi]+': '+esc(P.s)+'</summary><ul>'+P.l.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><button class="sm" data-a="follow" data-k="'+k+'">✅ Ho seguito il piano</button></details>';}
- else planBlock='<details><summary>Cosa prevede il piano</summary><ul><li><b>Colazione</b>: frutta fresca 150g + mandorle/nocciole 10 o noci 2 o anacardi/pistacchi 10g o cioccolato fondente ≥85% 10g; oppure frutta 150g + shaker whey 30g</li><li><b>Spuntino mattina</b>: pancake Milk pro n.2 con velo di marmellata/miele; o cracker Galbusera/Misura + parmigiano stick 20g (max 2 volte); o pane integrale 60g + crudo/bresaola/arrostino 30g (max 2-3 volte), salmone affumicato 50g, humus 50g o philadelphia/ricotta 50g; + frutta 150g</li><li><b>Spuntino pomeriggio</b>: frutta 150g + yogurt greco 2% 170g / skyr 150g / kefir 150g / mousse proteica 200g (max 2 volte), o shaker whey 30g; cereali 40g solo nei giorni di allenamento</li><li><b>In più</b>: frutta 150g, cioccolato fondente ≥85% 10g. Max 1 banana al giorno</li></ul></details>';
+ if(P){planBlock='<details'+(k==='pranzo'||k==='cena'?'':' open')+'><summary>Piano di '+DN[wi]+': '+esc(P.s)+'</summary><ul>'+P.l.concat(k==='pomeriggio'&&day(sel).train?['Cereali 40g (giorno di allenamento)']:[],k==='colazione'?['1-2 bicchieri di acqua prima di colazione']:[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><button class="sm" data-a="follow" data-k="'+k+'">✅ Ho seguito il piano</button></details>';}
+ else planBlock='<details><summary>Fuori piano</summary><ul><li>In più nella giornata: frutta fresca 150g e cioccolato fondente min. 85% 10g</li><li>Quello che non consumi nella giornata si può recuperare in qualsiasi altro momento, anche dopo cena</li><li>Max 1 banana al giorno</li></ul></details>';
  const cats=Object.keys(CATS).map(c=>'<span class="tg'+(M.cats.includes(c)?' on':'')+'" data-a="cat" data-k="'+k+'" data-v="'+c+'">'+CATS[c]+'</span>').join('');
- const chips=M.ing.map((g,i)=>'<span class="chip">'+esc(g.n)+(g.g?' · '+esc(g.g)+'g':'')+'<button data-a="rmIng" data-k="'+k+'" data-i="'+i+'">×</button></span>').join('');
+ const chips=M.ing.map((g,i)=>'<span class="chip">'+esc(g.n)+(g.g?' · '+esc(g.g)+'g':'')+(nutOf(g)?' · '+Math.round(nutOf(g)[0])+' kcal':' · ?')+'<button data-a="rmIng" data-k="'+k+'" data-i="'+i+'">×</button></span>').join('');
  return '<div class="card" id="m-'+k+'"><div class="row sp"><h2>'+SLOT[k]+'</h2>'+(logged(M)?'<span class="badge">registrato</span>':'<span class="mut">da registrare</span>')+'</div>'+planBlock+
  '<h3>Cosa hai mangiato</h3><textarea data-f="txt" data-k="'+k+'" placeholder="Descrivi il pasto">'+esc(M.text)+'</textarea>'+
- '<h3>Ingredienti</h3><div>'+(chips||'<span class="mut">Nessun ingrediente inserito</span>')+'</div>'+
- '<div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="in-'+k+'" data-f="ing" data-k="'+k+'" placeholder="Ingrediente (es. salmone)" style="flex:3"><input id="ig-'+k+'" type="number" inputmode="decimal" placeholder="g" style="flex:1;min-width:64px"><button class="pri" data-a="addIng" data-k="'+k+'">+</button></div>'+
+ '<h3>Ingredienti</h3><div>'+(chips||'<span class="mut">Nessun ingrediente inserito</span>')+'</div>'+mealLine(M)+
+ '<div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="in-'+k+'" data-f="ing" data-k="'+k+'" list="foods" autocomplete="off" placeholder="Alimento (es. pasta, patate)" style="flex:3"><input id="ig-'+k+'" type="number" inputmode="decimal" placeholder="g (vuoto = porzione)" style="flex:1;min-width:64px"><button class="pri" data-a="addIng" data-k="'+k+'">+</button></div>'+
  '<h3>Tipo di alimenti (per il report)</h3><div>'+cats+'</div>'+
  '<div class="grid" style="margin-top:10px"><div><div class="mut">🫒 Olio (g)</div><input type="number" inputmode="decimal" data-f="oil" data-k="'+k+'" value="'+(M.oil||'')+'" placeholder="0"><div class="row" style="margin-top:6px"><button class="sm" data-a="add" data-f="oil" data-k="'+k+'" data-v="5">+5</button><button class="sm" data-a="add" data-f="oil" data-k="'+k+'" data-v="10">+10</button><button class="sm" data-a="add" data-f="oil" data-k="'+k+'" data-v="-9999">0</button></div></div>'+
  '<div><div class="mut">🧂 Sale (g)</div><input type="number" inputmode="decimal" step="0.1" data-f="salt" data-k="'+k+'" value="'+(M.salt||'')+'" placeholder="0"><div class="row" style="margin-top:6px"><button class="sm" data-a="add" data-f="salt" data-k="'+k+'" data-v="0.5">+0,5</button><button class="sm" data-a="add" data-f="salt" data-k="'+k+'" data-v="1">+1</button><button class="sm" data-a="add" data-f="salt" data-k="'+k+'" data-v="-9999">0</button></div></div></div>'+
@@ -178,15 +283,16 @@ function vOggi(){
  const wn=Math.round(D.water*10)/10;
  let h='<h1>'+DN[wi]+' '+d.getDate()+'/'+(d.getMonth()+1)+'</h1><div class="row sp" style="margin-bottom:8px"><button class="sm" data-a="week" data-v="-7">‹ Sett.</button><button class="sm" data-a="today">Oggi</button><button class="sm" data-a="week" data-v="7">Sett. ›</button></div>'+strip+
  '<div id="banners">'+bannersHTML()+'</div>'+
- '<div class="card"><h2>Riepilogo del giorno</h2>'+
+ '<div class="card"><h2>Riepilogo del giorno</h2>'+nutHTML(dayN(sel))+
  '<div class="row sp"><b>💧 Acqua</b><span>'+fmt(D.water)+' / 2,5 L</span></div>'+bar(D.water,2.5,'wat')+
  '<div class="row"><button class="sm wat" data-a="water" data-v="0.2">+ bicchiere 0,2 L</button><button class="sm wat" data-a="water" data-v="0.5">+ bottiglia 0,5 L</button><button class="sm" data-a="water" data-v="-0.2">−</button></div>'+
  '<div class="row sp" style="margin-top:12px"><b>🫒 Olio extravergine</b><span class="'+(T.oil>40?'high':'')+'">'+fmt(T.oil)+' / 40 g</span></div>'+bar(T.oil,40)+
  '<div class="row sp"><b>🧂 Sale</b><span class="'+(T.salt>5?'high':'')+'">'+fmt(T.salt)+' / 5 g</span></div>'+bar(T.salt,5)+
  '<div class="grid" style="margin-top:8px"><div class="stat"><div class="mut">☕ Caffè (max 2)</div><b class="'+(D.coffee>2?'high':'')+'">'+D.coffee+'</b><div class="row" style="margin-top:6px"><button class="sm" data-a="coffee" data-v="1">+1</button><button class="sm" data-a="coffee" data-v="-1">−</button></div></div>'+
  '<div class="stat"><div class="mut">🍯 Zucchero/miele (max 5 g)</div><b class="'+(D.sugar>5?'high':'')+'">'+fmt(D.sugar)+' g</b><div class="row" style="margin-top:6px"><button class="sm" data-a="sugar" data-v="5">+5</button><button class="sm" data-a="sugar" data-v="-5">−</button></div></div></div>'+
+ '<div style="margin-top:10px"><label class="chk"><input type="checkbox" data-f="train"'+(D.train?' checked':'')+'> 🏋️ Palestra oggi</label>'+(D.train?'':'<label class="chk" style="margin-top:6px"><input type="checkbox" data-f="cardio"'+(D.cardio?' checked':'')+'> 🚶 Giorno OFF: almeno 30 min di cardio fatti</label>')+'</div>'+
  '<p class="mut" style="margin-bottom:0">Olio: 4 cucchiai da minestra (40 g) al giorno, 1 cucchiaino = 5 g, 1 cucchiaio = 10 g. Sale: max 5 g/giorno, meglio iodato.</p></div>'+
- mealCard('altro',wi)+mealCard('pranzo',wi)+mealCard('cena',wi)+
+ mealCard('colazione',wi)+mealCard('mattina',wi)+mealCard('pranzo',wi)+mealCard('pomeriggio',wi)+mealCard('cena',wi)+mealCard('altro',wi)+
  '<div class="card"><h2>💧 Promemoria acqua</h2><label class="chk"><input type="checkbox" data-f="on"'+(DB.set.on?' checked':'')+'> Avvisi ogni ora</label>'+
  '<div class="row" style="margin-top:8px"><span>Dalle</span><input type="number" data-f="from" value="'+DB.set.from+'" min="0" max="23" style="width:70px"><span>alle</span><input type="number" data-f="to" value="'+DB.set.to+'" min="0" max="23" style="width:70px"></div>'+
  '<div class="row" style="margin-top:8px"><button class="sm" data-a="notif">Attiva notifiche del browser</button><button class="sm" data-a="testWater">Prova avviso</button></div>'+
@@ -197,19 +303,19 @@ function vOggi(){
 function stat(n,min,max){if(n<min)return'low';if(n>max)return'high';return'ok';}
 function weekData(ms){
  const mon=parse(ms);const c={pesce:0,formaggio:0,carne:0,affettati:0,uova:0,legumi:0,libero:0,meals:0};
- const ing={};const rows=[];let oilS=0,saltS=0,waterS=0,coffeeS=0,sugarS=0,dl=0,oilOver=0,saltOver=0,waterOk=0,coffeeOver=0,sugarOver=0,wd=0;
- for(let i=0;i<7;i++){const s=ymd(addDays(mon,i)),D=DB.days[s];let t={oil:0,salt:0},n=0;
-  if(D){t=totals(s);
-   Object.keys(D.meals).forEach(k=>{const m=D.meals[k];if(!logged(m))return;if(k!=='altro')n++;if(k!=='altro')c.meals++;
+ const ing={};const rows=[];let oilS=0,saltS=0,waterS=0,coffeeS=0,sugarS=0,dl=0,oilOver=0,saltOver=0,waterOk=0,coffeeOver=0,sugarOver=0,wd=0,tr=0,cd=0,nd=0,kcalOver=0,nutS={kcal:0,p:0,c:0,f:0,s:0,fib:0};
+ for(let i=0;i<7;i++){const s=ymd(addDays(mon,i)),D=DB.days[s],nu=dayN(s);let t={oil:0,salt:0},n=0;if(nu.kcal>0){nd++;NK.forEach(x=>{nutS[x]+=nu[x];});if(nu.kcal>TG.kcal)kcalOver++;}
+  if(D){t=totals(s);if(D.train)tr++;else if(D.cardio)cd++;
+   Object.keys(D.meals).forEach(k=>{const m=D.meals[k];if(!logged(m))return;if(k==='pranzo'||k==='cena'){n++;c.meals++;}
     new Set(m.cats).forEach(x=>{c[x]++;});if(m.free)c.libero++;
     m.ing.forEach(g=>{const key=g.n.trim().toLowerCase();if(!key)return;if(!ing[key])ing[key]={n:g.n.trim(),c:0,g:0};ing[key].c++;ing[key].g+=+g.g||0;});});
    const any=n>0||t.oil||t.salt||D.water||D.coffee||D.sugar||Object.values(D.meals).some(logged);
    if(any){dl++;oilS+=t.oil;saltS+=t.salt;if(t.oil>40)oilOver++;if(t.salt>5)saltOver++;}
    if(D.water>0){wd++;waterS+=D.water;if(D.water>=2.5)waterOk++;}
    coffeeS+=D.coffee;if(D.coffee>2)coffeeOver++;sugarS+=D.sugar;if(D.sugar>5)sugarOver++;}
-  rows.push({s,i,D,t,n});}
+  rows.push({s,i,D,t,n,nu});}
  c.carneTot=c.carne+c.affettati;
- return{c,ing,rows,oilS,saltS,waterS,wd,dl,oilOver,saltOver,waterOk,coffeeS,coffeeOver,sugarS,sugarOver};}
+ return{nd,kcalOver,nutS,tr,cd,c,ing,rows,oilS,saltS,waterS,wd,dl,oilOver,saltOver,waterOk,coffeeS,coffeeOver,sugarS,sugarOver};}
 function reportLines(W){const c=W.c;return[
  ['🐟 Pesce (min 3)',c.pesce,stat(c.pesce,3,99)],
  ['🧀 Formaggi (1-2)',c.formaggio,stat(c.formaggio,1,2)],
@@ -219,12 +325,15 @@ function reportLines(W){const c=W.c;return[
  ['🫘 Legumi (min 3)',c.legumi,stat(c.legumi,3,99)],
  ['🎉 Pasto libero (1)',c.libero,stat(c.libero,0,1)]];}
 function vSett(){
- const mon=parse(repMon),end=addDays(mon,6),W=weekData(repMon),L=reportLines(W);
+ const mon=parse(repMon),end=addDays(mon,6),W=weekData(repMon),L=reportLines(W),av=k=>W.nd?W.nutS[k]/W.nd:0;
+ const nrow=(lab,v,tg,cls,u)=>'<div class="st"><span>'+lab+'</span><b class="'+cls+'">'+Math.round(v)+' / '+tg+u+'</b></div>';
  const lab=mon.getDate()+'/'+(mon.getMonth()+1)+' – '+end.getDate()+'/'+(end.getMonth()+1);
  let h='<h1>Resoconto settimanale</h1><div class="row sp" style="margin-bottom:10px"><button class="sm" data-a="rep" data-v="-7">‹</button><b>'+lab+'</b><button class="sm" data-a="rep" data-v="7">›</button></div>'+
  '<div class="card"><h2>Frequenze di consumo</h2><div class="mut" style="margin-bottom:6px">Pasti registrati (pranzo + cena): '+W.c.meals+' / 14</div>'+
  L.map(r=>'<div class="st"><span>'+r[0]+'</span><b class="'+r[2]+'">'+r[1]+(r[2]==='ok'?' ✓':r[2]==='low'?' · pochi':' · troppi')+'</b></div>').join('')+
  '<p class="mut" style="margin-bottom:0">Conta i pasti in cui compare ogni categoria.</p></div>'+
+ '<div class="card"><h2>Nutrienti: media al giorno</h2><div class="mut" style="margin-bottom:6px">Calcolata su '+W.nd+' giorni con alimenti registrati · giorni oltre '+TG.kcal+' kcal: '+W.kcalOver+'</div>'+
+ nrow('🔥 Energia',av('kcal'),TG.kcal,av('kcal')>TG.kcal?'high':'ok',' kcal')+nrow('🥩 Proteine (max)',av('p'),TG.p,av('p')>TG.p?'high':'ok',' g')+nrow('🍝 Glucidi',av('c'),TG.c,'',' g')+nrow('🧈 Lipidi',av('f'),TG.f,av('f')>TG.f?'high':'ok',' g')+nrow('Grassi saturi (max)',av('s'),TG.s,av('s')>TG.s?'high':'ok',' g')+nrow('🌾 Fibre (min 25)',av('fib'),TG.fib,W.nd&&av('fib')<TG.fib?'low':'ok',' g')+'</div>'+
  '<div class="card"><h2>Medie e limiti</h2>'+
  '<div class="st"><span>💧 Acqua media (giorni registrati)</span><b>'+(W.wd?fmt(W.waterS/W.wd):0)+' L</b></div>'+
  '<div class="st"><span>Giorni con almeno 2,5 L</span><b class="'+(W.waterOk>=W.wd&&W.wd?'ok':'low')+'">'+W.waterOk+' / '+W.wd+'</b></div>'+
@@ -233,27 +342,42 @@ function vSett(){
  '<div class="st"><span>🧂 Sale medio al giorno</span><b>'+(W.dl?fmt(W.saltS/W.dl):0)+' g (tot '+fmt(W.saltS)+' g)</b></div>'+
  '<div class="st"><span>Giorni oltre 5 g di sale</span><b class="'+(W.saltOver?'high':'ok')+'">'+W.saltOver+'</b></div>'+
  '<div class="st"><span>☕ Caffè totali · giorni oltre 2</span><b class="'+(W.coffeeOver?'high':'')+'">'+W.coffeeS+' · '+W.coffeeOver+'</b></div>'+
- '<div class="st"><span>🍯 Zucchero/miele · giorni oltre 5 g</span><b class="'+(W.sugarOver?'high':'')+'">'+fmt(W.sugarS)+' g · '+W.sugarOver+'</b></div></div>'+
- '<div class="card"><h2>Giorno per giorno</h2><div class="scroll"><table><tr><th>Giorno</th><th>Pasti</th><th>Acqua</th><th>Olio</th><th>Sale</th></tr>'+
- W.rows.map(r=>'<tr><td>'+DN[r.i].slice(0,3)+'</td><td>'+r.n+'/2</td><td>'+(r.D?fmt(r.D.water):0)+' L</td><td class="'+(r.t.oil>40?'high':'')+'">'+fmt(r.t.oil)+' g</td><td class="'+(r.t.salt>5?'high':'')+'">'+fmt(r.t.salt)+' g</td></tr>').join('')+'</table></div></div>'+
+ '<div class="st"><span>🍯 Zucchero/miele · giorni oltre 5 g</span><b class="'+(W.sugarOver?'high':'')+'">'+fmt(W.sugarS)+' g · '+W.sugarOver+'</b></div><div class="st"><span>🏋️ Giorni di palestra · cardio nei giorni OFF</span><b>'+W.tr+' · '+W.cd+'</b></div></div>'+
+ '<div class="card"><h2>Giorno per giorno</h2><div class="scroll"><table><tr><th>Giorno</th><th>Pasti</th><th>Kcal</th><th>Acqua</th><th>Olio</th><th>Sale</th></tr>'+
+ W.rows.map(r=>'<tr><td>'+DN[r.i].slice(0,3)+'</td><td>'+r.n+'/2</td><td>'+Math.round(r.nu.kcal)+'</td><td>'+(r.D?fmt(r.D.water):0)+' L</td><td class="'+(r.t.oil>40?'high':'')+'">'+fmt(r.t.oil)+' g</td><td class="'+(r.t.salt>5?'high':'')+'">'+fmt(r.t.salt)+' g</td></tr>').join('')+'</table></div></div>'+
  '<div class="card"><h2>Ingredienti della settimana</h2>'+(Object.keys(W.ing).length?Object.values(W.ing).sort((a,b)=>b.c-a.c).map(g=>'<span class="chip" style="padding-right:12px">'+esc(g.n)+' ×'+g.c+(g.g?' · '+fmt(g.g)+'g':'')+'</span>').join(''):'<span class="mut">Nessun ingrediente inserito in questa settimana.</span>')+'</div>'+
  '<div class="card"><button class="pri" data-a="copy" style="width:100%">📋 Copia il resoconto</button></div>';
  $('#app').innerHTML=h;}
 function reportText(){const W=weekData(repMon),mon=parse(repMon),end=addDays(mon,6);
  let t='RESOCONTO '+mon.getDate()+'/'+(mon.getMonth()+1)+' – '+end.getDate()+'/'+(end.getMonth()+1)+'\nPasti registrati: '+W.c.meals+'/14\n';
  reportLines(W).forEach(r=>{t+=r[0]+': '+r[1]+'\n';});
- t+='Acqua media: '+(W.wd?fmt(W.waterS/W.wd):0)+' L (giorni ≥2,5 L: '+W.waterOk+')\nOlio medio: '+(W.dl?fmt(W.oilS/W.dl):0)+' g/giorno, giorni >40 g: '+W.oilOver+'\nSale medio: '+(W.dl?fmt(W.saltS/W.dl):0)+' g/giorno, giorni >5 g: '+W.saltOver+'\nCaffè: '+W.coffeeS+'\n';
+ t+='Acqua media: '+(W.wd?fmt(W.waterS/W.wd):0)+' L (giorni ≥2,5 L: '+W.waterOk+')\nOlio medio: '+(W.dl?fmt(W.oilS/W.dl):0)+' g/giorno, giorni >40 g: '+W.oilOver+'\nSale medio: '+(W.dl?fmt(W.saltS/W.dl):0)+' g/giorno, giorni >5 g: '+W.saltOver+'\nCaffè: '+W.coffeeS+'\nPalestra: '+W.tr+' giorni, cardio nei giorni OFF: '+W.cd+'\n'+(W.nd?'Medie/giorno: '+Math.round(W.nutS.kcal/W.nd)+' kcal (obiettivo '+TG.kcal+'), proteine '+Math.round(W.nutS.p/W.nd)+' g, glucidi '+Math.round(W.nutS.c/W.nd)+' g, lipidi '+Math.round(W.nutS.f/W.nd)+' g, fibre '+Math.round(W.nutS.fib/W.nd)+' g\n':'');
  const ig=Object.values(W.ing).sort((a,b)=>b.c-a.c).map(g=>g.n+' x'+g.c);
  t+='Ingredienti: '+(ig.join(', ')||'-');return t;}
+
+/* ---------- VIEW ALIMENTI ---------- */
+let fq='';
+function foodRow(f){const por=f.por||100;
+ return '<div class="st"><div><b>'+esc(f.n)+'</b><div class="mut">Porzione indicativa '+por+' g ≈ '+Math.round(f.k*por/100)+' kcal</div></div><div style="text-align:right;white-space:nowrap"><b>'+Math.round(f.k)+'</b> kcal<div class="mut">P '+fmt(f.p)+' · C '+fmt(f.c)+' · L '+fmt(f.f)+'</div>'+(f.custom?'<button class="sm" data-a="delFood" data-n="'+esc(f.n)+'">elimina</button>':'')+'</div></div>';}
+function foodRows(){const q=fq.trim().toLowerCase(),A=allFoods().filter(f=>!q||f.n.toLowerCase().includes(q));
+ if(!A.length)return '<span class="mut">Nessun alimento trovato.</span>';
+ const cats=[];A.forEach(f=>{if(!cats.includes(f.cat))cats.push(f.cat);});
+ return cats.map(c=>'<h3>'+esc(c)+'</h3>'+A.filter(f=>f.cat===c).map(foodRow).join('')).join('');}
+function vCibi(){
+ const inp=(id,ph)=>'<input id="'+id+'" type="number" inputmode="decimal" step="0.1" placeholder="'+ph+'">';
+ $('#app').innerHTML='<h1>Alimenti</h1><p class="mut" style="margin-top:0">Valori indicativi per 100 g di alimento crudo (o come indicato), con la porzione tipica del piano. P = proteine, C = glucidi, L = lipidi.</p>'+
+ '<input id="fsearch" data-f="fq" placeholder="Cerca un alimento (es. riso)" value="'+esc(fq)+'" style="margin-bottom:10px">'+
+ '<div class="card" id="flist">'+foodRows()+'</div>'+
+ '<div class="card"><h2>Aggiungi un alimento</h2><p class="mut" style="margin-top:0">Inserisci i valori per 100 g, come da etichetta.</p><input id="cn" placeholder="Nome (es. Pizza surgelata)"><div class="grid" style="margin-top:8px">'+inp('ck','Kcal')+inp('cp','Proteine g')+inp('cc','Glucidi g')+inp('cf','Lipidi g')+inp('cs','Saturi g (facolt.)')+inp('cfi','Fibre g (facolt.)')+'</div><div style="margin-top:8px">'+inp('cpor','Porzione tipica in g')+'</div><button class="pri" style="width:100%;margin-top:10px" data-a="addFood">Salva alimento</button></div>';}
 
 /* ---------- VIEW PIANO ---------- */
 function vPiano(){
  const ti=widx(new Date());
- let days=PLAN.map((p,i)=>'<details'+(i===ti?' open':'')+'><summary>'+DN[i]+(i===ti?' · oggi':'')+'</summary><b>Pranzo – '+esc(p.pranzo.s)+'</b><ul>'+p.pranzo.l.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><b>Cena – '+esc(p.cena.s)+'</b><ul>'+p.cena.l.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>').join('');
+ let days=PLAN.map((p,i)=>'<details'+(i===ti?' open':'')+'><summary>'+DN[i]+(i===ti?' · oggi':'')+'</summary>'+['colazione','mattina','pranzo','pomeriggio','cena'].map(k=>'<b>'+SLOT[k]+' – '+esc(p[k].s)+'</b><ul>'+p[k].l.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>').join('')+'</details>').join('');
  const h='<h1>Il mio piano</h1>'+
- '<div class="card"><h2>Obiettivi</h2><div class="grid"><div class="stat"><div class="mut">Energia media</div><b>2250 kcal</b></div><div class="stat"><div class="mut">Carboidrati / Proteine / Lipidi</div><b>50% / 22% / 28%</b></div><div class="stat"><div class="mut">Proteine (max)</div><b>125 g</b></div><div class="stat"><div class="mut">Fibra</div><b>25-30 g/die</b></div></div>'+
+ '<div class="card"><h2>Obiettivi</h2><div class="grid"><div class="stat"><div class="mut">Energia media</div><b>2250 kcal</b></div><div class="stat"><div class="mut">Carboidrati / Proteine / Lipidi</div><b>50% / 22% / 28%</b></div><div class="stat"><div class="mut">Proteine max · Glucidi · Lipidi</div><b>125 · 281 · 70 g</b></div><div class="stat"><div class="mut">Fibra</div><b>25-30 g/die</b></div></div>'+
  '<ul><li>Dieta ipocalorica; grassi saturi &lt;10% delle calorie totali; zuccheri semplici &lt;15%</li><li>Colesterolo &lt;300 mg/die; equilibrio nutrizionale</li><li>Acqua: almeno 2,5 L al di fuori dei pasti (5 bottigliette da 0,5 L o circa 12 bicchieri)</li><li>Attività fisica: palestra + almeno 30 minuti di cardio nei giorni OFF</li></ul></div>'+
- '<div class="card"><h2>Menu settimanale</h2><p class="mut" style="margin-top:0">Pasta, riso (basmati, thai, venere, rosso, integrale), farro, orzo, cous cous, quinoa sono intercambiabili nelle stesse quantità. Si possono invertire i menu giornalieri in blocco e il pranzo con la cena. Un pasto libero a settimana.</p>'+days+'</div>'+
+ '<div class="card"><h2>Menu settimanale</h2><p class="mut" style="margin-top:0">Pasta, riso (basmati, thai, venere, rosso, integrale), farro, orzo, cous cous, quinoa sono intercambiabili nelle stesse quantità. Si possono invertire i menu giornalieri in blocco e il pranzo con la cena. Un pasto libero a settimana. Colazioni e spuntini sono una rotazione costruita con le opzioni del piano, rispettando i limiti (yogurt/skyr max 2 volte, affettati max 1, formaggi 1-2 a settimana).</p>'+days+'</div>'+
  '<div class="card"><h2>Alimenti e frequenze</h2>'+
  '<details open><summary>🐟 Pesce: minimo 3 volte a settimana</summary>Prediligere pesce azzurro e pesci grassi di piccola taglia: sardina, sgombro, sugarello (suro), tonno, trota di lago, salmone, orata, spigola, aringa, merluzzo, sogliola, palombo, coda di rospo, razza, platessa (acciuga/alici barrate nel piano). Crostacei e molluschi: gamberi, gamberetti, cozze, vongole, scampi, polpo. Affumicati: salmone, pesce spada, tonno, storione. Scatolame: tonno, sardine, sgombro all\'olio (da sgocciolare).</details>'+
  '<details><summary>🧀 Formaggi: 1-2 volte a settimana</summary>Ricotta fresca, fiocchi di latte, mozzarella light, primo sale, parmigiano, stracchino, philadelphia light, robiola, certosa.</details>'+
@@ -274,13 +398,16 @@ function vPiano(){
  $('#app').innerHTML=h;}
 
 /* ---------- RENDER / EVENTS ---------- */
-function render(){const y=window.scrollY;({oggi:vOggi,sett:vSett,piano:vPiano})[tab]();
+function render(){const y=window.scrollY;({oggi:vOggi,sett:vSett,piano:vPiano,cibi:vCibi})[tab]();
  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===tab));window.scrollTo(0,y);}
 function addIng(k){const n=$('#in-'+k),g=$('#ig-'+k);const name=n.value.trim();if(!name)return;
- const M=meal(sel,k);M.ing.push({n:name,g:parseFloat(g.value)||0});
- detect(name).forEach(c=>{if(!M.cats.includes(c))M.cats.push(c);});
- const a=avoidHit(name);if(a)toast('⚠️ Nel piano: "'+a+'" è da evitare o limitare');
- save();render();const nn=$('#in-'+k);if(nn)nn.focus();}
+ const M=meal(sel,k),f=findFood(name);let gr=parseFloat(g.value)||0;const it={n:name,g:gr};
+ if(f){if(!gr){gr=f.por||100;it.g=gr;}it.nu=scale(f,gr);}
+ M.ing.push(it);
+ detect(name+' '+(f?f.n:'')).forEach(c=>{if(!M.cats.includes(c))M.cats.push(c);});
+ let msg='';const a=avoidHit(name);if(a)msg='⚠️ Nel piano: "'+a+'" è da evitare o limitare. ';
+ msg+=f?f.n+' '+gr+' g ≈ '+Math.round(it.nu[0])+' kcal':'Valori non trovati per "'+name+'": aggiungilo in Alimenti';
+ toast(msg);save();render();const nn=$('#in-'+k);if(nn)nn.focus();}
 function act(a,ds){
  const k=ds.k,v=ds.v;
  if(a==='tab'){tab=v;render();window.scrollTo(0,0);}
@@ -300,14 +427,21 @@ function act(a,ds){
  else if(a==='goto'){const el=$('#m-'+k);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
  else if(a==='testWater'){needWater=true;notify();render();}
  else if(a==='notif'){try{if(!('Notification' in window)){toast('Notifiche non disponibili in questa pagina');return;}Notification.requestPermission().then(p=>toast(p==='granted'?'Notifiche attivate':'Notifiche non concesse'));}catch(e){toast('Notifiche non disponibili');}}
+ else if(a==='addFood'){const g=id=>parseFloat(($('#'+id)||{}).value)||0,name=(($('#cn')||{}).value||'').trim();
+  if(!name||!g('ck')){toast('Inserisci almeno nome e kcal per 100 g');return;}
+  DB.custom=(DB.custom||[]).filter(x=>x.n.toLowerCase()!==name.toLowerCase());
+  DB.custom.push({n:name,k:g('ck'),p:g('cp'),c:g('cc'),f:g('cf'),s:g('cs'),fi:g('cfi'),por:g('cpor')||100});save();fillList();render();toast('Alimento salvato');}
+ else if(a==='delFood'){DB.custom=(DB.custom||[]).filter(x=>x.n!==ds.n);save();fillList();render();}
  else if(a==='copy'){const t=reportText();try{navigator.clipboard.writeText(t).then(()=>toast('Resoconto copiato'),()=>toast('Copia non riuscita'));}catch(e){toast('Copia non riuscita');}}
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset);});
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset.f==='txt'){meal(sel,t.dataset.k).text=t.value;save();}});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.f==='fq'){fq=t.value;const l=$('#flist');if(l)l.innerHTML=foodRows();return;}if(t.dataset.f==='txt'){meal(sel,t.dataset.k).text=t.value;save();}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.f==='ing'){e.preventDefault();addIng(e.target.dataset.k);}});
 document.addEventListener('change',e=>{const t=e.target,f=t.dataset.f;if(!f)return;
  if(f==='oil'||f==='salt'){meal(sel,t.dataset.k)[f]=Math.max(0,parseFloat(t.value)||0);save();render();}
  else if(f==='free'){meal(sel,t.dataset.k).free=t.checked;save();render();}
+ else if(f==='train'){day(sel).train=t.checked;save();render();}
+ else if(f==='cardio'){day(sel).cardio=t.checked;save();}
  else if(f==='on'){DB.set.on=t.checked;save();}
  else if(f==='from'||f==='to'){DB.set[f]=Math.min(23,Math.max(0,parseInt(t.value)||0));save();}});
 
@@ -318,7 +452,7 @@ function tick(){const now=new Date(),h=now.getHours();
  if(inWin(h)&&lastHour!==h&&wAck!==h){lastHour=h;needWater=true;notify();}
  if(!inWin(h))needWater=false;
  if(tab==='oggi'){const b=$('#banners');if(b){const html=bannersHTML();if(b.innerHTML!==html)b.innerHTML=html;}}}
-render();tick();setInterval(tick,20000);
+fillList();render();tick();setInterval(tick,20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
 </script>
 </body>
