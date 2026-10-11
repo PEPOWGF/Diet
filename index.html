@@ -186,7 +186,7 @@ function vOggi(){
  '<div class="grid" style="margin-top:8px"><div class="stat"><div class="mut">☕ Caffè (max 2)</div><b class="'+(D.coffee>2?'high':'')+'">'+D.coffee+'</b><div class="row" style="margin-top:6px"><button class="sm" data-a="coffee" data-v="1">+1</button><button class="sm" data-a="coffee" data-v="-1">−</button></div></div>'+
  '<div class="stat"><div class="mut">🍯 Zucchero/miele (max 5 g)</div><b class="'+(D.sugar>5?'high':'')+'">'+fmt(D.sugar)+' g</b><div class="row" style="margin-top:6px"><button class="sm" data-a="sugar" data-v="5">+5</button><button class="sm" data-a="sugar" data-v="-5">−</button></div></div></div>'+
  '<p class="mut" style="margin-bottom:0">Olio: 4 cucchiai da minestra (40 g) al giorno, 1 cucchiaino = 5 g, 1 cucchiaio = 10 g. Sale: max 5 g/giorno, meglio iodato.</p></div>'+
- mealCard('pranzo',wi)+mealCard('cena',wi)+mealCard('altro',wi)+
+ mealCard('altro',wi)+mealCard('pranzo',wi)+mealCard('cena',wi)+
  '<div class="card"><h2>💧 Promemoria acqua</h2><label class="chk"><input type="checkbox" data-f="on"'+(DB.set.on?' checked':'')+'> Avvisi ogni ora</label>'+
  '<div class="row" style="margin-top:8px"><span>Dalle</span><input type="number" data-f="from" value="'+DB.set.from+'" min="0" max="23" style="width:70px"><span>alle</span><input type="number" data-f="to" value="'+DB.set.to+'" min="0" max="23" style="width:70px"></div>'+
  '<div class="row" style="margin-top:8px"><button class="sm" data-a="notif">Attiva notifiche del browser</button><button class="sm" data-a="testWater">Prova avviso</button></div>'+
