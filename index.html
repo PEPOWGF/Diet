@@ -82,6 +82,7 @@ datalist{display:none}
 <nav class="tabs" id="tabs">
 <button data-a="tab" data-v="oggi"><span>📝</span>Oggi</button>
 <button data-a="tab" data-v="sett"><span>📊</span>Settimana</button>
+<button data-a="tab" data-v="prog"><span>📈</span>Progressi</button>
 <button data-a="tab" data-v="cibi"><span>🍽️</span>Alimenti</button>
 <button data-a="tab" data-v="piano"><span>📖</span>Piano</button>
 </nav>
@@ -90,8 +91,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DN=['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const KEY='dieta_diario_v1';
-let DB={custom:[],days:{},set:{on:true,from:15,to:22}};
-try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);DB.days=p.days||{};DB.custom=p.custom||[];DB.set=Object.assign(DB.set,p.set||{});}}catch(e){}
+let DB={body:{},custom:[],days:{},set:{on:true,from:15,to:22}};
+try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);DB.days=p.days||{};DB.custom=p.custom||[];DB.body=p.body||{};DB.set=Object.assign(DB.set,p.set||{});}}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}}
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -295,7 +296,7 @@ function vOggi(){
  const wn=Math.round(D.water*10)/10;
  let h='<h1>'+DN[wi]+' '+d.getDate()+'/'+(d.getMonth()+1)+'</h1><div class="row sp" style="margin-bottom:8px"><button class="sm" data-a="week" data-v="-7">‹ Sett.</button><button class="sm" data-a="today">Oggi</button><button class="sm" data-a="week" data-v="7">Sett. ›</button></div>'+strip+
  '<div id="banners">'+bannersHTML()+'</div>'+
- '<div class="card"><h2>Riepilogo del giorno</h2>'+nutHTML(dayN(sel))+
+ missingHTML()+'<div class="card"><h2>Riepilogo del giorno</h2>'+nutHTML(dayN(sel))+
  '<div class="row sp"><b>💧 Acqua</b><span>'+fmt(D.water)+' / 2,5 L</span></div>'+bar(D.water,2.5,'wat')+
  '<div class="row"><button class="sm wat" data-a="water" data-v="0.1">+0,1</button><button class="sm wat" data-a="water" data-v="0.2">+0,2</button><button class="sm wat" data-a="water" data-v="0.3">+0,3</button><button class="sm wat" data-a="water" data-v="0.5">+0,5 L</button><button class="sm" data-a="water" data-v="-0.1">−0,1</button></div><div class="mut">Bicchiere ≈ 0,2 L · bottiglietta = 0,5 L</div>'+
  '<div class="row sp" style="margin-top:12px"><b>🫒 Olio extravergine</b><span class="'+(T.oil>40?'high':'')+'">'+fmt(T.oil)+' / 40 g</span></div>'+bar(T.oil,40)+
@@ -365,8 +366,83 @@ function reportText(){const W=weekData(repMon),mon=parse(repMon),end=addDays(mon
  let t='RESOCONTO '+mon.getDate()+'/'+(mon.getMonth()+1)+' – '+end.getDate()+'/'+(end.getMonth()+1)+'\nPasti registrati: '+W.c.meals+'/14\n';
  reportLines(W).forEach(r=>{t+=r[0]+': '+r[1]+'\n';});
  t+='Acqua media: '+(W.wd?fmt(W.waterS/W.wd):0)+' L (giorni ≥2,5 L: '+W.waterOk+')\nOlio medio: '+(W.dl?fmt(W.oilS/W.dl):0)+' g/giorno, giorni >40 g: '+W.oilOver+'\nSale medio: '+(W.dl?fmt(W.saltS/W.dl):0)+' g/giorno, giorni >5 g: '+W.saltOver+'\nCaffè: '+W.coffeeS+'\nPalestra: '+W.tr+' giorni, cardio nei giorni OFF: '+W.cd+'\n'+(W.nd?'Medie/giorno: '+Math.round(W.nutS.kcal/W.nd)+' kcal (obiettivo '+TG.kcal+'), proteine '+Math.round(W.nutS.p/W.nd)+' g, glucidi '+Math.round(W.nutS.c/W.nd)+' g, lipidi '+Math.round(W.nutS.f/W.nd)+' g, fibre '+Math.round(W.nutS.fib/W.nd)+' g\n':'');
+ const bwt=Object.keys(DB.body||{}).filter(d=>d>=repMon&&d<=ymd(end)&&DB.body[d].w).map(d=>DB.body[d].w+' kg ('+d.slice(8)+'/'+d.slice(5,7)+')');if(bwt.length)t+='Peso: '+bwt.join(', ')+'\n';
  const ig=Object.values(W.ing).sort((a,b)=>b.c-a.c).map(g=>g.n+' x'+g.c);
  t+='Ingredienti: '+(ig.join(', ')||'-');return t;}
+
+/* ---------- COSA MANCA QUESTA SETTIMANA ---------- */
+function bodyInWeek(m){const a=ymd(m),b=ymd(addDays(m,6));return Object.keys(DB.body||{}).some(d=>d>=a&&d<=b);}
+function missingHTML(){
+ const mon=monday(parse(sel)),W=weekData(ymd(mon)),c=W.c,curMon=monday(new Date());
+ const isCur=ymd(mon)===ymd(curMon),past=mon<curMon,left=isCur?7-widx(new Date()):(past?0:7),end=addDays(mon,6);
+ const rows=[['🐟 Pesce (min 3)',c.pesce,3,99],['🍗 Carne, affettati inclusi (3-4)',c.carneTot,3,4],['🫘 Legumi (min 3)',c.legumi,3,99],['🧀 Formaggi (1-2)',c.formaggio,1,2],['🥚 Uova (2-4)',c.uova,2,4],['🥓 Affettati (max 1)',c.affettati,0,1]];
+ let todo=0,html='';
+ rows.forEach(r=>{const n=r[1],min=r[2],max=r[3];let cls='ok',txt=n+' ✓';
+  if(n<min){cls='low';txt=n+'/'+min+' · '+((min-n)===1?'ti manca 1':'ti mancano '+(min-n));todo++;}
+  else if(n>max){cls='high';txt=n+' · oltre il massimo';todo++;}
+  html+='<div class="st"><span>'+r[0]+'</span><b class="'+cls+'">'+txt+'</b></div>';});
+ html+='<div class="st"><span>🎉 Pasto libero (1)</span><b class="'+(c.libero>1?'high':(c.libero?'ok':'mut'))+'">'+(c.libero>1?c.libero+' · oltre il massimo':(c.libero?'usato ✓':'non ancora usato'))+'</b></div>';
+ let w='';
+ if(isCur&&!bodyInWeek(mon))w='<div class="row sp" style="margin-top:8px"><span>⚖️ Peso della settimana non registrato</span><button class="sm" data-a="tab" data-v="prog">Registra</button></div>';
+ return '<div class="card"><h2>📋 Cosa ti manca questa settimana</h2><div class="mut" style="margin-bottom:4px">'+mon.getDate()+'/'+(mon.getMonth()+1)+' – '+end.getDate()+'/'+(end.getMonth()+1)+(isCur?' · restano '+left+(left===1?' giorno':' giorni')+' (oggi incluso)':(past?' · settimana conclusa':''))+'</div>'+
+ (todo?'':'<div class="ok" style="margin:4px 0"><b>Sei in linea con il piano ✓</b></div>')+html+w+
+ '<div class="mut" style="margin-top:6px">Conta i pasti in cui hai segnato il tipo di alimento.</div></div>';}
+
+/* ---------- PROGRESSI: PESO, MISURE E GRAFICI ---------- */
+const BK={w:['Peso','kg','bw'],vita:['Vita','cm','bv'],fianchi:['Fianchi','cm','bf'],petto:['Petto','cm','bp'],braccio:['Braccio','cm','bb'],coscia:['Coscia','cm','bc']};
+let bodyKey='w',rng=8;
+function svgChart(vals,labels,o){
+ o=o||{};const n=vals.length,W=320,H=170,pl=38,pr=8,pt=14,pb=24,iw=W-pl-pr,ih=H-pt-pb;
+ const nums=vals.filter(v=>v!=null);
+ if(!nums.length)return '<div class="mut">Nessun dato ancora.</div>';
+ let lo=Math.min.apply(null,nums),hi=Math.max.apply(null,nums);
+ if(o.target!=null){lo=Math.min(lo,o.target);hi=Math.max(hi,o.target);}
+ if(o.zero)lo=0;
+ if(hi===lo){hi+=1;if(!o.zero)lo-=1;}
+ const pad=(hi-lo)*0.12;hi+=pad;if(!o.zero)lo-=pad;
+ const Y=v=>pt+ih*(1-(v-lo)/(hi-lo)),isBar=o.type==='bar';
+ const X=i=>isBar?pl+(i+0.5)*iw/n:pl+(n===1?iw/2:i*iw/(n-1));
+ const f=x=>(hi-lo)>20?String(Math.round(x)):String(Math.round(x*10)/10);
+ let g='';
+ for(let k=0;k<=3;k++){const v=lo+(hi-lo)*k/3,y=Y(v);g+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line)"/><text x="'+(pl-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" style="fill:var(--mut)">'+f(v)+'</text>';}
+ if(o.target!=null){const y=Y(o.target);g+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" stroke-dasharray="4 3" style="stroke:var(--warn)"/>';}
+ const col=v=>o.target==null?'var(--ac)':(o.kind==='max'?(v>o.target?'var(--bad)':'var(--ac)'):(v>=o.target?'var(--ok)':'var(--ac)'));
+ if(isBar){const bw=iw/n*0.6;vals.forEach((v,i)=>{if(v==null)return;const y=Y(v),h=Math.max(1,Y(lo)-y);
+   g+='<rect x="'+(X(i)-bw/2)+'" y="'+y+'" width="'+bw+'" height="'+h+'" rx="3" style="fill:'+col(v)+'"/>';
+   if(n<=8)g+='<text x="'+X(i)+'" y="'+(y-3)+'" text-anchor="middle" font-size="9" style="fill:var(--tx)">'+f(v)+'</text>';});}
+ else{let d='',open=false;vals.forEach((v,i)=>{if(v==null){open=false;return;}d+=(open?'L':'M')+X(i)+' '+Y(v)+' ';open=true;});
+  g+='<path d="'+d+'" fill="none" stroke-width="2" style="stroke:var(--ac)"/>';
+  vals.forEach((v,i)=>{if(v==null)return;g+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3" style="fill:var(--ac)"/>';
+   if(n<=8||i===n-1)g+='<text x="'+X(i)+'" y="'+(Y(v)-6)+'" text-anchor="middle" font-size="9" style="fill:var(--tx)">'+f(v)+'</text>';});}
+ const st=Math.max(1,Math.ceil(n/6));
+ labels.forEach((l,i)=>{if(i%st===0)g+='<text x="'+X(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" style="fill:var(--mut)">'+esc(l)+'</text>';});
+ return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" role="img">'+g+'</svg>';}
+function dmy(d){return d.slice(8)+'/'+d.slice(5,7);}
+function vProg(){
+ const B=DB.body||{},dates=Object.keys(B).sort(),today=ymd(new Date());
+ const pts=dates.filter(d=>B[d][bodyKey]>0),vals=pts.map(d=>B[d][bodyKey]),bk=BK[bodyKey];
+ let sum='<div class="mut">Nessuna misura registrata.</div>';
+ if(pts.length){const last=vals[vals.length-1],sg=x=>(x>0?'+':'')+fmt(x)+' '+bk[1];
+  sum='<div><b style="font-size:20px">'+fmt(last)+' '+bk[1]+'</b> <span class="mut">('+dmy(pts[pts.length-1])+')</span></div>'+(pts.length>1?'<div class="mut">'+sg(last-vals[vals.length-2])+' rispetto alla misura precedente · '+sg(last-vals[0])+' dall\'inizio</div>':'');}
+ const sel_=Object.keys(BK).map(k=>'<span class="tg'+(k===bodyKey?' on':'')+'" data-a="bodyKey" data-v="'+k+'">'+BK[k][0]+'</span>').join('');
+ const inp=(id,ph)=>'<input id="'+id+'" type="number" inputmode="decimal" step="0.1" placeholder="'+ph+'">';
+ const list=dates.slice().reverse().slice(0,8).map(d=>'<div class="st"><span>'+d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4)+' · '+Object.keys(BK).filter(k=>B[d][k]>0).map(k=>BK[k][0].toLowerCase()+' '+B[d][k]+' '+BK[k][1]).join(', ')+'</span><button class="sm" data-a="delBody" data-d="'+d+'">elimina</button></div>').join('');
+ const weeks=[],cm=monday(new Date());
+ for(let i=rng-1;i>=0;i--){const m=addDays(cm,-7*i),W=weekData(ymd(m));
+  weeks.push({lab:m.getDate()+'/'+(m.getMonth()+1),kcal:W.nd?W.nutS.kcal/W.nd:null,p:W.nd?W.nutS.p/W.nd:null,fib:W.nd?W.nutS.fib/W.nd:null,water:W.wd?W.waterS/W.wd:null});}
+ const labs=weeks.map(w=>w.lab),ch=(t,sub,key,o)=>'<div class="card"><h2>'+t+'</h2><div class="mut">'+sub+'</div>'+svgChart(weeks.map(w=>w[key]),labs,o)+'</div>';
+ const rg=[4,8,12].map(r=>'<span class="tg'+(r===rng?' on':'')+'" data-a="rng" data-v="'+r+'">'+r+' sett.</span>').join('');
+ $('#app').innerHTML='<h1>Progressi</h1>'+
+ '<div class="card"><h2>⚖️ Peso e misure</h2><div class="mut" style="margin-bottom:6px">Una pesata a settimana, sempre allo stesso orario, è sufficiente.</div>'+
+ '<input id="bd" type="date" value="'+today+'" style="margin-bottom:8px"><div class="grid">'+inp('bw','Peso (kg)')+inp('bv','Vita (cm)')+inp('bf','Fianchi (cm)')+inp('bp','Petto (cm)')+inp('bb','Braccio (cm)')+inp('bc','Coscia (cm)')+'</div>'+
+ '<button class="pri" style="width:100%;margin-top:10px" data-a="saveBody">Salva misure</button></div>'+
+ '<div class="card"><h2>Andamento</h2><div>'+sel_+'</div><div style="margin:8px 0">'+sum+'</div>'+svgChart(vals,pts.map(dmy),{type:'line'})+(list?'<h3>Ultime registrazioni</h3>'+list:'')+'</div>'+
+ '<div class="row sp" style="margin:4px 0 10px"><b>Tendenze settimanali</b><div>'+rg+'</div></div>'+
+ '<div class="mut" style="margin-bottom:8px">Medie al giorno per settimana, calcolate sui giorni registrati. La linea tratteggiata è l\'obiettivo del piano.</div>'+
+ ch('🔥 Energia (kcal/giorno)','Obiettivo 2250 kcal','kcal',{type:'bar',target:TG.kcal,kind:'max',zero:true})+
+ ch('💧 Acqua (L/giorno)','Obiettivo almeno 2,5 L','water',{type:'bar',target:2.5,kind:'min',zero:true})+
+ ch('🥩 Proteine (g/giorno)','Massimo 125 g','p',{type:'bar',target:TG.p,kind:'max',zero:true})+
+ ch('🌾 Fibre (g/giorno)','Obiettivo 25-30 g','fib',{type:'bar',target:TG.fib,kind:'min',zero:true});}
 
 /* ---------- VIEW ALIMENTI ---------- */
 let fq='';
@@ -411,7 +487,7 @@ function vPiano(){
  $('#app').innerHTML=h;}
 
 /* ---------- RENDER / EVENTS ---------- */
-function render(){const y=window.scrollY;({oggi:vOggi,sett:vSett,piano:vPiano,cibi:vCibi})[tab]();
+function render(){const y=window.scrollY;({oggi:vOggi,sett:vSett,piano:vPiano,cibi:vCibi,prog:vProg})[tab]();
  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===tab));window.scrollTo(0,y);}
 function addIng(k){const n=$('#in-'+k),g=$('#ig-'+k);const name=n.value.trim();if(!name)return;
  const M=meal(sel,k),f=findFood(name);let gr=parseFloat(g.value)||0;const it={n:name,g:gr};
@@ -445,10 +521,16 @@ function act(a,ds){
   DB.custom=(DB.custom||[]).filter(x=>x.n.toLowerCase()!==name.toLowerCase());
   DB.custom.push({n:name,k:g('ck'),p:g('cp'),c:g('cc'),f:g('cf'),s:g('cs'),fi:g('cfi'),por:g('cpor')||100});save();fillList();render();toast('Alimento salvato');}
  else if(a==='delFood'){DB.custom=(DB.custom||[]).filter(x=>x.n!==ds.n);save();fillList();render();}
- else if(a==='bkExport'){const t=JSON.stringify({days:DB.days,custom:DB.custom,set:DB.set});try{navigator.clipboard.writeText(t).then(()=>toast('Backup copiato: incollalo in Note'),()=>toast('Copia non riuscita'));}catch(e){toast('Copia non riuscita');}}
+ else if(a==='rng'){rng=+v;render();}
+ else if(a==='bodyKey'){bodyKey=v;render();}
+ else if(a==='saveBody'){const d=(($('#bd')||{}).value)||ymd(new Date()),e=Object.assign({},DB.body[d]||{});let any=false;
+  Object.keys(BK).forEach(k=>{const x=parseFloat((($('#'+BK[k][2]))||{}).value);if(x>0){e[k]=x;any=true;}});
+  if(!any){toast('Inserisci almeno un valore');return;}DB.body[d]=e;save();render();toast('Misure salvate');}
+ else if(a==='delBody'){delete DB.body[ds.d];save();render();}
+ else if(a==='bkExport'){const t=JSON.stringify({days:DB.days,custom:DB.custom,set:DB.set,body:DB.body});try{navigator.clipboard.writeText(t).then(()=>toast('Backup copiato: incollalo in Note'),()=>toast('Copia non riuscita'));}catch(e){toast('Copia non riuscita');}}
  else if(a==='bkImport'){const v=(($('#bkin')||{}).value||'').trim();if(!v){toast('Incolla prima il backup');return;}
   try{const o=JSON.parse(v);if(!o||typeof o.days!=='object')throw 0;if(!confirm('Sostituire tutti i dati attuali con il backup?'))return;
-   DB.days=o.days;DB.custom=o.custom||[];DB.set=Object.assign({on:true,from:15,to:22},o.set||{});save();fillList();render();toast('Backup ripristinato');}catch(e){toast('Backup non valido');}}
+   DB.days=o.days;DB.custom=o.custom||[];DB.body=o.body||{};DB.set=Object.assign({on:true,from:15,to:22},o.set||{});save();fillList();render();toast('Backup ripristinato');}catch(e){toast('Backup non valido');}}
  else if(a==='copy'){const t=reportText();try{navigator.clipboard.writeText(t).then(()=>toast('Resoconto copiato'),()=>toast('Copia non riuscita'));}catch(e){toast('Copia non riuscita');}}
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset);});
